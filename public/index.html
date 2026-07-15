@@ -29,7 +29,7 @@
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Shared Resume Renderer -->
-    <script src="js/resume-renderer.js"></script>
+    <script src="js/resume-renderer.js?v=4"></script>
     <!-- html2pdf & html2canvas & jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -564,6 +564,30 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Custom Font Sizes per Section -->
+                    <div class="space-y-4 pt-4 border-t border-gray-800">
+                        <h3 class="text-base font-bold text-gray-100 flex items-center gap-2">
+                            <i class="fa-solid fa-text-height text-emerald-400"></i>
+                            <span>ปรับแต่งขนาดอักษรรายส่วน (Custom Font Sizes)</span>
+                        </h3>
+                        <p class="text-xs text-gray-500">ปรับเพิ่ม-ลดขนาดตัวอักษรเฉพาะของเทมเพลตปัจจุบันได้แบบอิสระ (หน่วยเป็นพิกเซล)</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="custom-font-sizes-container">
+                            <!-- JS will render the custom font size controls here dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Custom Gaps per Section -->
+                    <div class="space-y-4 pt-4 border-t border-gray-800">
+                        <h3 class="text-base font-bold text-gray-100 flex items-center gap-2">
+                            <i class="fa-solid fa-arrows-up-down text-emerald-400"></i>
+                            <span>ปรับแต่งระยะห่างรายส่วน (Custom Spacing & Gaps)</span>
+                        </h3>
+                        <p class="text-xs text-gray-500">ปรับเพิ่ม-ลดระยะขอบและระยะห่างระหว่างจุดต่าง ๆ ของเทมเพลตปัจจุบันได้แบบอิสระ (หน่วยเป็นพิกเซล)</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="custom-gaps-container">
+                            <!-- JS will render the custom gap controls here dynamically -->
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -680,6 +704,11 @@
                     btn.classList.add('border-transparent', 'text-gray-400');
                 }
             });
+
+            if (tabId === 'tab-styling') {
+                renderCustomFontControls();
+                renderCustomGapControls();
+            }
         }
 
         // 3. API interactions
@@ -740,6 +769,8 @@
                     syncDataToForm();
                     // Render template
                     renderResume();
+                    renderCustomFontControls();
+                    renderCustomGapControls();
                     // Update selectors
                     populateResumeSelector();
                     showSaveStatus('saved', 'โหลดข้อมูลสำเร็จ');
@@ -937,7 +968,9 @@
                 primary_color: document.getElementById('field-primary-color').value,
                 font_family: document.getElementById('field-font-family').value,
                 font_size: document.getElementById('field-font-size').value,
-                margins: document.getElementById('field-margins').value
+                margins: document.getElementById('field-margins').value,
+                custom_sizes: currentResumeData.styling?.custom_sizes,
+                custom_gaps: currentResumeData.styling?.custom_gaps
             };
         }
 
@@ -1342,6 +1375,8 @@
             currentResumeData.styling.template = tplName;
             setTemplateUIActive(tplName);
             renderResume();
+            renderCustomFontControls();
+            renderCustomGapControls();
             triggerAutoSave();
         }
 
@@ -1383,13 +1418,30 @@
 
         function updateFontSize(sizeName) {
             currentResumeData.styling.font_size = sizeName;
+            
+            // Delete custom sizes for active template so they reset/re-initialize using the new tier defaults
+            const tpl = currentResumeData.styling.template || 'modern-slate';
+            if (currentResumeData.styling.custom_sizes && currentResumeData.styling.custom_sizes[tpl]) {
+                delete currentResumeData.styling.custom_sizes[tpl];
+            }
+            
             renderResume();
+            renderCustomFontControls();
+            renderCustomGapControls();
             triggerAutoSave();
         }
 
         function updateMargins(marginName) {
             currentResumeData.styling.margins = marginName;
+            
+            // Delete custom gaps for active template so they reset/re-initialize using the new margin tier defaults
+            const tpl = currentResumeData.styling.template || 'modern-slate';
+            if (currentResumeData.styling.custom_gaps && currentResumeData.styling.custom_gaps[tpl]) {
+                delete currentResumeData.styling.custom_gaps[tpl];
+            }
+
             renderResume();
+            renderCustomGapControls();
             triggerAutoSave();
         }
 
@@ -1543,6 +1595,251 @@
         function renderResume() {
             const printArea = document.getElementById('resume-print-area');
             renderResumeData(currentResumeData, printArea);
+        }
+
+        // 11. Custom Font Sizes per Section Controls
+        function renderCustomFontControls() {
+            const container = document.getElementById('custom-font-sizes-container');
+            if (!container) return;
+
+            const tpl = currentResumeData.styling.template || 'modern-slate';
+            
+            // Ensure sizes are initialized by the renderer first
+            if (!currentResumeData.styling.custom_sizes || !currentResumeData.styling.custom_sizes[tpl]) {
+                renderResume();
+            }
+
+            const sizes = currentResumeData.styling.custom_sizes[tpl];
+            if (!sizes) return;
+
+            const groups = {
+                'ข้อมูลส่วนตัว (Candidate Profile)': {
+                    name: 'ขนาดชื่อผู้สมัคร',
+                    title: 'ขนาดตำแหน่งงาน'
+                },
+                'โครงสร้าง & หัวข้อหลัก (Layout & Headers)': {
+                    sectionHeading: 'ขนาดหัวข้อส่วนหลัก (Section Heading)'
+                },
+                'ข้อมูลติดต่อ (Contact Info)': {
+                    contactLabel: 'ขนาดหัวข้อช่องทางติดต่อ',
+                    contactValue: 'ขนาดรายละเอียดติดต่อ'
+                },
+                'ประวัติย่อ (Professional Summary)': {
+                    summaryBody: 'ขนาดเนื้อหาประวัติย่อ'
+                },
+                'ประวัติการทำงาน (Experience)': {
+                    expTitle: 'ขนาดชื่อตำแหน่งงาน',
+                    expCompany: 'ขนาดชื่อบริษัท/หน่วยงาน',
+                    expPeriod: 'ขนาดช่วงระยะเวลาทำงาน',
+                    expDetails: 'ขนาดรายละเอียดงาน/จุดกระสุน',
+                    expLineHeight: 'ระยะบรรทัดจุดกระสุน (Bullet Line Height)'
+                },
+                'การศึกษา (Education)': {
+                    eduDegree: 'ขนาดปริญญา/สาขาวิชา',
+                    eduInst: 'ขนาดชื่อสถานศึกษา',
+                    eduPeriod: 'ขนาดช่วงระยะเวลาเรียน'
+                },
+                'ทักษะความสามารถ (Skills)': {
+                    skillCat: 'ขนาดชื่อหมวดหมู่ทักษะ',
+                    skillItems: 'ขนาดรายการทักษะย่อย'
+                }
+            };
+
+            container.innerHTML = '';
+            
+            Object.keys(groups).forEach(groupTitle => {
+                const groupKeys = groups[groupTitle];
+                
+                // Only render the group if at least one of its keys exists in sizes
+                const hasKeys = Object.keys(groupKeys).some(key => sizes[key] !== undefined);
+                if (!hasKeys) return;
+                
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'col-span-1 sm:col-span-2 mt-4 first:mt-0 pb-1 border-b border-gray-800/60';
+                groupHeader.innerHTML = `
+                    <span class="text-xs font-bold text-emerald-400 tracking-wider uppercase">${groupTitle}</span>
+                `;
+                container.appendChild(groupHeader);
+                
+                Object.keys(groupKeys).forEach(key => {
+                    if (sizes[key] === undefined) return;
+                    
+                    const label = groupKeys[key];
+                    const val = sizes[key];
+                    
+                    const isLineHeight = key === 'expLineHeight';
+                    const suffix = isLineHeight ? '' : 'px';
+                    const step = isLineHeight ? 0.1 : 0.5;
+                    const decStep = isLineHeight ? -0.1 : -0.5;
+                    const incStep = isLineHeight ? 0.1 : 0.5;
+                    
+                    const item = document.createElement('div');
+                    item.className = 'flex flex-col bg-slate-900 border border-gray-800 rounded-xl p-3 shadow-sm';
+                    item.innerHTML = `
+                        <span class="text-xs font-semibold text-gray-400 mb-2 truncate" title="${label}">${label}</span>
+                        <div class="flex items-center justify-between bg-slate-950 px-2 py-1.5 rounded-lg border border-gray-800">
+                            <button onclick="changeCustomFontSize('${key}', ${decStep})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:bg-slate-900 rounded-md transition border border-gray-800" title="ลดขนาด">
+                                <i class="fa-solid fa-minus text-xs"></i>
+                            </button>
+                            <span class="text-xs font-bold text-gray-200">${val}${suffix}</span>
+                            <button onclick="changeCustomFontSize('${key}', ${incStep})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:bg-slate-900 rounded-md transition border border-gray-800" title="เพิ่มขนาด">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            });
+        }
+
+        function changeCustomFontSize(key, amount) {
+            if (!currentResumeData.styling.custom_sizes) {
+                currentResumeData.styling.custom_sizes = {};
+            }
+            const tpl = currentResumeData.styling.template || 'modern-slate';
+            
+            if (!currentResumeData.styling.custom_sizes[tpl]) {
+                const fontSize = currentResumeData.styling.font_size || 'medium';
+                const defaultTemplatesSizes = {
+                    'modern-slate': {
+                        small: { name: 36, title: 20, sectionHeading: 13, summaryBody: 14, contactLabel: 11.5, contactValue: 13, expTitle: 20, expCompany: 11.5, expPeriod: 11.5, expDetails: 13, eduDegree: 13, eduInst: 11.5, eduPeriod: 11.5, skillCat: 13, skillItems: 14, expLineHeight: 1.3 },
+                        medium: { name: 48, title: 24, sectionHeading: 16, summaryBody: 17, contactLabel: 14, contactValue: 15.5, expTitle: 24, expCompany: 14, expPeriod: 14, expDetails: 15.5, eduDegree: 15.5, eduInst: 14, eduPeriod: 14, skillCat: 15.5, skillItems: 17, expLineHeight: 1.5 },
+                        large: { name: 60, title: 30, sectionHeading: 19, summaryBody: 19, contactLabel: 16, contactValue: 18, expTitle: 30, expCompany: 16, expPeriod: 16, expDetails: 18, eduDegree: 18, eduInst: 16, eduPeriod: 16, skillCat: 18, skillItems: 19, expLineHeight: 1.7 }
+                    },
+                    'ivory-minimal': {
+                        small: { name: 24, title: 11, sectionHeading: 11, summaryBody: 11, contactLabel: 9, contactValue: 10, expTitle: 12, expCompany: 10, expPeriod: 9, expDetails: 10, eduDegree: 10, eduInst: 10, eduPeriod: 9, skillCat: 10, skillItems: 11, expLineHeight: 1.3 },
+                        medium: { name: 30, title: 12, sectionHeading: 12, summaryBody: 12, contactLabel: 10, contactValue: 11, expTitle: 14, expCompany: 11, expPeriod: 10, expDetails: 11, eduDegree: 11, eduInst: 11, eduPeriod: 10, skillCat: 11, skillItems: 12, expLineHeight: 1.5 },
+                        large: { name: 36, title: 14, sectionHeading: 14, summaryBody: 14, contactLabel: 11.5, contactValue: 13, expTitle: 16, expCompany: 13, expPeriod: 11.5, expDetails: 13, eduDegree: 13, eduInst: 13, eduPeriod: 11.5, skillCat: 13, skillItems: 14, expLineHeight: 1.7 }
+                    },
+                    'tech-emerald': {
+                        small: { name: 20, title: 11, sectionHeading: 11, summaryBody: 11, contactLabel: 9.5, contactValue: 11, expTitle: 11, expCompany: 9.5, expPeriod: 9.5, expDetails: 11, eduDegree: 11, eduInst: 10, eduPeriod: 9, skillCat: 11, skillItems: 9, expLineHeight: 1.3 },
+                        medium: { name: 24, title: 12, sectionHeading: 12, summaryBody: 12, contactLabel: 10, contactValue: 12, expTitle: 12, expCompany: 10, expPeriod: 10, expDetails: 12, eduDegree: 12, eduInst: 10, eduPeriod: 10, skillCat: 12, skillItems: 10, expLineHeight: 1.5 },
+                        large: { name: 28, title: 13.5, sectionHeading: 13.5, summaryBody: 13.5, contactLabel: 11, contactValue: 13.5, expTitle: 13.5, expCompany: 11, expPeriod: 11, expDetails: 13.5, eduDegree: 13.5, eduInst: 11, eduPeriod: 11, skillCat: 13.5, skillItems: 11, expLineHeight: 1.7 }
+                    },
+                    'creative-lavender': {
+                        small: { name: 15, title: 9.5, sectionHeading: 9.5, summaryBody: 11, contactLabel: 9, contactValue: 11, expTitle: 11, expCompany: 9.5, expPeriod: 9, expDetails: 11, eduDegree: 11, eduInst: 10, eduPeriod: 9, skillCat: 11, skillItems: 11, expLineHeight: 1.3 },
+                        medium: { name: 18, title: 11, sectionHeading: 11, summaryBody: 12, contactLabel: 10, contactValue: 12, expTitle: 12, expCompany: 10, expPeriod: 10, expDetails: 12, eduDegree: 12, eduInst: 10, eduPeriod: 10, skillCat: 12, skillItems: 12, expLineHeight: 1.5 },
+                        large: { name: 22, title: 13, sectionHeading: 13, summaryBody: 13.5, contactLabel: 11, contactValue: 13.5, expTitle: 13.5, expCompany: 11, expPeriod: 11, expDetails: 13.5, eduDegree: 13.5, eduInst: 11, eduPeriod: 11, skillCat: 13.5, skillItems: 13.5, expLineHeight: 1.7 }
+                    }
+                };
+                const templateDefaults = defaultTemplatesSizes[tpl] || defaultTemplatesSizes['modern-slate'];
+                currentResumeData.styling.custom_sizes[tpl] = JSON.parse(JSON.stringify(templateDefaults[fontSize] || templateDefaults['medium']));
+            }
+            
+            const isLineHeight = key === 'expLineHeight';
+            let val = parseFloat(currentResumeData.styling.custom_sizes[tpl][key]);
+            if (isNaN(val)) val = isLineHeight ? 1.5 : 12;
+            
+            val = Math.round((val + amount) * 10) / 10;
+            if (isLineHeight) {
+                val = Math.max(Math.min(val, 3.0), 1.0);
+            } else {
+                val = Math.max(Math.min(val, 100), 5);
+            }
+            
+            currentResumeData.styling.custom_sizes[tpl][key] = val;
+            
+            renderResume();
+            renderCustomFontControls();
+            renderCustomGapControls();
+            triggerAutoSave();
+        }
+
+        function renderCustomGapControls() {
+            const container = document.getElementById('custom-gaps-container');
+            if (!container) return;
+
+            const tpl = currentResumeData.styling.template || 'modern-slate';
+            
+            // Ensure gaps are initialized by the renderer first
+            if (!currentResumeData.styling.custom_gaps || !currentResumeData.styling.custom_gaps[tpl]) {
+                renderResume();
+            }
+
+            const gaps = currentResumeData.styling.custom_gaps[tpl];
+            if (!gaps) return;
+
+            const labels = {
+                mainSection: 'ระยะห่างระหว่างส่วนหลัก (Main Sections)',
+                sidebarSection: 'ระยะห่างระหว่างส่วนแถบข้าง (Sidebar Sections)',
+                expItem: 'ระยะห่างระหว่างงาน (Experience Items)',
+                eduItem: 'ระยะห่างระหว่างการศึกษา (Education)',
+                skillItem: 'ระยะห่างระหว่างทักษะ (Skills)',
+                contactItem: 'ระยะห่างช่องทางติดต่อ (Contact Items)',
+                sidebarPadding: 'ระยะขอบของแถบข้าง (Sidebar Padding)'
+            };
+
+            container.innerHTML = '';
+            
+            Object.keys(labels).forEach(key => {
+                if (gaps[key] === undefined) return;
+                
+                const label = labels[key];
+                const val = gaps[key];
+                
+                const item = document.createElement('div');
+                item.className = 'flex flex-col bg-slate-900 border border-gray-800 rounded-xl p-3 shadow-sm';
+                item.innerHTML = `
+                    <span class="text-xs font-semibold text-gray-400 mb-2 truncate" title="${label}">${label}</span>
+                    <div class="flex items-center justify-between bg-slate-950 px-2 py-1.5 rounded-lg border border-gray-800">
+                        <button onclick="changeCustomGap('${key}', -2)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:bg-slate-900 rounded-md transition border border-gray-800" title="ลดระยะห่าง">
+                            <i class="fa-solid fa-minus text-xs"></i>
+                        </button>
+                        <span class="text-xs font-bold text-gray-200">${val}px</span>
+                        <button onclick="changeCustomGap('${key}', 2)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:bg-slate-900 rounded-md transition border border-gray-800" title="เพิ่มระยะห่าง">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function changeCustomGap(key, amount) {
+            if (!currentResumeData.styling.custom_gaps) {
+                currentResumeData.styling.custom_gaps = {};
+            }
+            const tpl = currentResumeData.styling.template || 'modern-slate';
+            
+            if (!currentResumeData.styling.custom_gaps[tpl]) {
+                const margins = currentResumeData.styling.margins || 'normal';
+                const defaultTemplatesGaps = {
+                    'modern-slate': {
+                        compact: { mainSection: 16, sidebarSection: 16, expItem: 12, eduItem: 8, skillItem: 8, contactItem: 6, sidebarPadding: 16 },
+                        normal: { mainSection: 36, sidebarSection: 36, expItem: 24, eduItem: 16, skillItem: 12, contactItem: 10, sidebarPadding: 24 },
+                        spacious: { mainSection: 56, sidebarSection: 56, expItem: 48, eduItem: 32, skillItem: 24, contactItem: 16, sidebarPadding: 40 }
+                    },
+                    'ivory-minimal': {
+                        compact: { mainSection: 12, sidebarSection: 12, expItem: 12, eduItem: 6, skillItem: 6, contactItem: 6, sidebarPadding: 16 },
+                        normal: { mainSection: 24, sidebarSection: 24, expItem: 20, eduItem: 10, skillItem: 10, contactItem: 8, sidebarPadding: 24 },
+                        spacious: { mainSection: 40, sidebarSection: 40, expItem: 36, eduItem: 20, skillItem: 20, contactItem: 12, sidebarPadding: 32 }
+                    },
+                    'tech-emerald': {
+                        compact: { mainSection: 16, sidebarSection: 16, expItem: 12, eduItem: 8, skillItem: 8, contactItem: 6, sidebarPadding: 16 },
+                        normal: { mainSection: 36, sidebarSection: 36, expItem: 24, eduItem: 16, skillItem: 12, contactItem: 10, sidebarPadding: 24 },
+                        spacious: { mainSection: 56, sidebarSection: 56, expItem: 48, eduItem: 32, skillItem: 24, contactItem: 16, sidebarPadding: 40 }
+                    },
+                    'creative-lavender': {
+                        compact: { mainSection: 16, sidebarSection: 16, expItem: 12, eduItem: 8, skillItem: 8, contactItem: 6, sidebarPadding: 16 },
+                        normal: { mainSection: 36, sidebarSection: 36, expItem: 24, eduItem: 16, skillItem: 12, contactItem: 10, sidebarPadding: 24 },
+                        spacious: { mainSection: 56, sidebarSection: 56, expItem: 48, eduItem: 32, skillItem: 24, contactItem: 16, sidebarPadding: 40 }
+                    }
+                };
+                const templateGaps = defaultTemplatesGaps[tpl] || defaultTemplatesGaps['modern-slate'];
+                currentResumeData.styling.custom_gaps[tpl] = JSON.parse(JSON.stringify(templateGaps[margins] || templateGaps['normal']));
+            }
+            
+            let val = parseFloat(currentResumeData.styling.custom_gaps[tpl][key]);
+            if (isNaN(val)) val = 12;
+            val = Math.round((val + amount) * 10) / 10;
+            val = Math.max(Math.min(val, 150), 0);
+            
+            currentResumeData.styling.custom_gaps[tpl][key] = val;
+            
+            renderResume();
+            renderCustomFontControls();
+            renderCustomGapControls();
+            triggerAutoSave();
         }
         async function exportToImage() {
             if (!currentResumeId) return;
