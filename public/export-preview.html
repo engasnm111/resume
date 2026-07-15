@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Resume Export Preview</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#090d16',
+                        panelBg: '#111827',
+                        borderCol: '#1f2937',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for English and Thai -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Force exact A4 dimensions at 100% scale for printing/export */
+        #resume-print-area {
+            width: 794px !important;
+            height: 1123px !important;
+            min-width: 794px !important;
+            min-height: 1123px !important;
+            max-width: 794px !important;
+            max-height: 1123px !important;
+            position: relative;
+            background: white;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        
+        /* Auto-fit inner wrapper styles identical to main editor */
+        .a4-inner {
+            width: 794px;
+            height: 1123px;
+            min-height: 1123px;
+            transform-origin: top left;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        .a4-inner > * {
+            flex: 1;
+            min-height: 0;
+        }
+
+        #resume-print-area,
+        #resume-print-area *,
+        #resume-print-area *::before,
+        #resume-print-area *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- The exact target container -->
+    <div id="resume-print-area"></div>
+
+    <!-- Load the shared renderer script -->
+    <script src="js/resume-renderer.js"></script>
+    <script>
+        window.resumeReady = false;
+
+        async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+            if (!id) {
+                console.error("Missing resume id parameter");
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/resumes/${id}`);
+                const result = await res.json();
+                if (result.status === 'success') {
+                    const resumeData = result.data.resume_data;
+                    resumeData.profile_image = result.data.profile_image;
+                    resumeData.title = result.data.title;
+                    
+                    const printArea = document.getElementById('resume-print-area');
+                    
+                    // Render the resume data to the print area and wait for auto-fit to finish
+                    await renderResumeData(resumeData, printArea);
+                    
+                    // Signal to Puppeteer that the page is ready for screenshot/PDF capture
+                    // We add a tiny safety buffer to make sure any image repaints/fonts are fully settled
+                    setTimeout(() => {
+                        window.resumeReady = true;
+                    }, 300);
+                } else {
+                    console.error("Failed to load resume:", result.message);
+                }
+            } catch (err) {
+                console.error("Initialization error:", err);
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
